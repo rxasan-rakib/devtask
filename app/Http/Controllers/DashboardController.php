@@ -7,6 +7,7 @@ use App\Models\TaskType;
 use App\Models\Client;
 use App\Models\Reminder;
 use App\Models\User;
+use App\Models\TaskLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -15,6 +16,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        /** @var User $user */
         $user = Auth::user();
         abort_if(!$user->can('view dashboard'), 403, 'Unauthorized access to dashboard.');
 
@@ -74,7 +76,7 @@ class DashboardController extends Controller
             ->get();
 
         // Recent activity (task logs)
-        $recentActivity = \App\Models\TaskLog::with(['task.taskType', 'user'])
+        $recentActivity = TaskLog::with(['task.taskType', 'user'])
             ->whereHas('task')
             ->when(!$canViewAll, fn($q) => $q->whereHas('task', fn($tq) =>
                 $tq->where('assigned_to', $user->id)->orWhere('created_by', $user->id)
@@ -105,7 +107,11 @@ class DashboardController extends Controller
                 $q->where('assigned_to', $user->id);
             }
         }])
-        ->having('tasks_count', '>', 0)
+        ->whereHas('tasks', function($q) use ($canViewAll, $user) {
+            if (!$canViewAll) {
+                $q->where('assigned_to', $user->id);
+            }
+        })
         ->orderByDesc('tasks_count')
         ->get();
 

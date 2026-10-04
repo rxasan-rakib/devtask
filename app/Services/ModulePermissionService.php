@@ -3,14 +3,16 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class ModulePermissionService
 {
     /**
      * Get all active modules and their database-verified permissions.
-     * If a permission does not exist in DB, it is omitted.
-     * If a module section has no permissions in DB, the section is completely omitted.
+     * If any defined permissions are missing in DB, it auto-syncs them seamlessly.
      */
     public static function getModules(bool $onlyExistingInDb = true): array
     {
@@ -22,7 +24,16 @@ class ModulePermissionService
 
         $dbPerms = null;
         try {
-            if (Schema::hasTable('permissions')) {
+            $tableName = config('permission.table_names.permissions', 'permissions');
+            if (Schema::hasTable($tableName)) {
+                $allNames = self::getAllPermissionNames();
+                $existingCount = Permission::whereIn('name', $allNames)->count();
+
+                // Self-healing: if any defined catalog permissions are missing in DB, sync them automatically
+                if ($existingCount < count($allNames)) {
+                    self::syncCatalogToDatabase();
+                }
+
                 $dbPerms = Permission::all()->keyBy('name');
             }
         } catch (\Throwable $e) {
@@ -52,6 +63,122 @@ class ModulePermissionService
         }
 
         return $filteredModules;
+    }
+
+    /**
+     * Synchronize all catalog permissions and default role permissions to database.
+     * Safe to run during migrations, seeders, commands, or auto-healing bootstrap.
+     */
+    public static function syncCatalogToDatabase(): void
+    {
+        try {
+            $permTable = config('permission.table_names.permissions', 'permissions');
+            $roleTable = config('permission.table_names.roles', 'roles');
+
+            if (!Schema::hasTable($permTable) || !Schema::hasTable($roleTable)) {
+                return;
+            }
+
+            // 1. Reset cached roles and permissions
+            try {
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+            } catch (\Throwable $e) {}
+
+            // 2. Ensure all defined permissions exist in DB
+            $allPermissions = self::getAllPermissionNames();
+            foreach ($allPermissions as $permissionName) {
+                Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => 'web']);
+            }
+
+            // 3. Super Admin -> All Permissions
+            $superAdmin = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+            $superAdmin->syncPermissions(Permission::all());
+
+            // 4. Default Roles -> Standard Permission Sets
+            $defaultRoleMaps = [
+                'project-coordinator' => [
+                    'view dashboard',
+                    'view all tasks stats',
+                    'view tasks',
+                    'view all tasks',
+                    'create tasks',
+                    'edit tasks',
+                    'delete tasks',
+                    'assign tasks',
+                    'change task status',
+                    'add task comments',
+                    'delete task comments',
+                    'view clients',
+                    'create clients',
+                    'edit clients',
+                    'delete clients',
+                    'view reminders',
+                    'create reminders',
+                    'edit reminders',
+                    'delete reminders',
+                    'mark reminders sent',
+                    'view notifications',
+                    'manage notifications',
+                    'delete notifications',
+                    'view users',
+                    'create users',
+                    'edit users',
+                    'view roles',
+                    'view reports',
+                ],
+                'support-engineer' => [
+                    'view dashboard',
+                    'view tasks',
+                    'create tasks',
+                    'edit tasks',
+                    'change task status',
+                    'add task comments',
+                    'view clients',
+                    'create clients',
+                    'view reminders',
+                    'create reminders',
+                    'edit reminders',
+                    'mark reminders sent',
+                    'view notifications',
+                    'manage notifications',
+                ],
+                'developer' => [
+                    'view dashboard',
+                    'view tasks',
+                    'create tasks',
+                    'edit tasks',
+                    'change task status',
+                    'add task comments',
+                    'view clients',
+                    'view reminders',
+                    'create reminders',
+                    'edit reminders',
+                    'mark reminders sent',
+                    'view notifications',
+                    'manage notifications',
+                ],
+                'viewer' => [
+                    'view dashboard',
+                    'view tasks',
+                    'view clients',
+                    'view notifications',
+                    'view reports',
+                ],
+            ];
+
+            foreach ($defaultRoleMaps as $roleName => $perms) {
+                $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+                $role->givePermissionTo(array_intersect($allPermissions, $perms));
+            }
+
+            // 5. Reset cache again
+            try {
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+            } catch (\Throwable $e) {}
+
+        } catch (\Throwable $e) {
+            Log::warning('ModulePermissionService::syncCatalogToDatabase error: ' . $e->getMessage());
+        }
     }
 
     /**

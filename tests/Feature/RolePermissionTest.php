@@ -92,4 +92,33 @@ class RolePermissionTest extends TestCase
         $response->assertSessionHas('error');
         $this->assertDatabaseHas('roles', ['name' => 'super-admin']);
     }
+
+    public function test_developer_role_can_access_dashboard_without_403(): void
+    {
+        ModulePermissionService::syncCatalogToDatabase();
+
+        $developerUser = User::factory()->create();
+        $developerRole = Role::findByName('developer', 'web');
+        $developerUser->assignRole($developerRole);
+
+        $this->assertTrue($developerUser->can('view dashboard'));
+
+        $response = $this->actingAs($developerUser)->get(route('dashboard'));
+        $response->assertStatus(200);
+        $response->assertDontSee('Unauthorized access to dashboard.');
+    }
+
+    public function test_module_permission_service_includes_dashboard_module(): void
+    {
+        ModulePermissionService::syncCatalogToDatabase();
+        $modules = ModulePermissionService::getModules(true);
+
+        $this->assertArrayHasKey('dashboard', $modules);
+        $this->assertEquals('Dashboard & Analytics', $modules['dashboard']['name']);
+
+        $permNames = array_column($modules['dashboard']['permissions'], 'name');
+        $this->assertContains('view dashboard', $permNames);
+        $this->assertContains('view all tasks stats', $permNames);
+    }
 }
+
