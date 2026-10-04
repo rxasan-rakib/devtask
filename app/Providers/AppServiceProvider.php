@@ -39,7 +39,13 @@ class AppServiceProvider extends ServiceProvider
             if (class_exists(\App\Services\ModulePermissionService::class)) {
                 foreach (\App\Services\ModulePermissionService::getAllPermissionNames() as $permName) {
                     if (! Gate::has($permName)) {
-                        Gate::define($permName, fn ($user) => method_exists($user, 'checkPermissionTo') && $user->checkPermissionTo($permName));
+                        Gate::define($permName, function ($user) use ($permName) {
+                            try {
+                                return method_exists($user, 'hasPermissionTo') && $user->hasPermissionTo($permName);
+                            } catch (\Throwable $e) {
+                                return false;
+                            }
+                        });
                     }
                 }
             }
@@ -49,7 +55,13 @@ class AppServiceProvider extends ServiceProvider
                 foreach (app(PermissionRegistrar::class)->getPermissions() as $permission) {
                     $name = $permission->name;
                     if (! Gate::has($name)) {
-                        Gate::define($name, fn ($user) => method_exists($user, 'checkPermissionTo') && $user->checkPermissionTo($name));
+                        Gate::define($name, function ($user) use ($name) {
+                            try {
+                                return method_exists($user, 'hasPermissionTo') && $user->hasPermissionTo($name);
+                            } catch (\Throwable $e) {
+                                return false;
+                            }
+                        });
                     }
                 }
             }

@@ -20,6 +20,9 @@ class Reminder extends Model
     ];
 
     protected $casts = [
+        'user_id'        => 'integer',
+        'client_id'      => 'integer',
+        'task_id'        => 'integer',
         'remind_at'      => 'datetime',
         'sent_at'        => 'datetime',
         'completed_at'   => 'datetime',

@@ -64,7 +64,7 @@ class NotificationController extends Controller
      */
     public function readAndRedirect(AppNotification $notification)
     {
-        abort_if($notification->user_id !== Auth::id(), 403);
+        abort_if((int) $notification->user_id !== (int) Auth::id() && !Gate::allows('manage notifications'), 403, 'Unauthorized access to notification.');
 
         $notification->markAsRead();
 
@@ -80,7 +80,7 @@ class NotificationController extends Controller
      */
     public function markAsRead(Request $request, AppNotification $notification)
     {
-        abort_if($notification->user_id !== Auth::id(), 403);
+        abort_if((int) $notification->user_id !== (int) Auth::id() && !Gate::allows('manage notifications'), 403, 'Unauthorized access to notification.');
 
         $notification->markAsRead();
 
@@ -101,7 +101,7 @@ class NotificationController extends Controller
      */
     public function markAsUnread(Request $request, AppNotification $notification)
     {
-        abort_if($notification->user_id !== Auth::id(), 403);
+        abort_if((int) $notification->user_id !== (int) Auth::id() && !Gate::allows('manage notifications'), 403, 'Unauthorized access to notification.');
 
         $notification->markAsUnread();
 
@@ -142,7 +142,7 @@ class NotificationController extends Controller
      */
     public function destroy(Request $request, AppNotification $notification)
     {
-        abort_if($notification->user_id !== Auth::id(), 403);
+        abort_if((int) $notification->user_id !== (int) Auth::id() && !Gate::allows('delete notifications'), 403, 'Unauthorized to delete this notification.');
 
         $notification->delete();
 

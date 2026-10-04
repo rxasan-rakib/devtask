@@ -127,7 +127,7 @@ class ReminderController extends Controller
 
     public function show(Reminder $reminder)
     {
-        abort_if(!Gate::allows('view reminders'), 403, 'Unauthorized access to reminder details.');
+        abort_if(!Gate::allows('view reminders') && (int) $reminder->user_id !== (int) Auth::id(), 403, 'Unauthorized access to reminder details.');
         return view('reminders.show', compact('reminder'));
     }
 
