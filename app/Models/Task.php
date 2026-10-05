@@ -17,6 +17,10 @@ class Task extends Model
     ];
 
     protected $casts = [
+        'assigned_to'       => 'integer',
+        'created_by'        => 'integer',
+        'client_id'         => 'integer',
+        'task_type_id'      => 'integer',
         'deadline'          => 'datetime',
         'completed_at'      => 'datetime',
         'is_reminder_sent'  => 'boolean',

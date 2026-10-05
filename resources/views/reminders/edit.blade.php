@@ -150,7 +150,17 @@
                         {{-- System URL --}}
                         <div class="col-12 col-md-6">
                             <label class="form-label-enhanced">System URL <span class="req">*</span></label>
-                            <input type="text" name="system_url" id="qc_system_url" class="form-control form-control-dark" placeholder="https://pos.clientdomain.com or https://clientwebsite.com" required>
+                            <div class="position-relative">
+                                <input type="text" name="system_url" id="qc_system_url" class="form-control form-control-dark" placeholder="https://pos.clientdomain.com or https://clientwebsite.com" required autocomplete="off">
+                                <span id="qc_url_spinner" class="spinner-border spinner-border-sm position-absolute end-0 top-50 translate-middle-y me-3 d-none" style="width: 14px; height: 14px; color: var(--accent);" role="status"></span>
+                            </div>
+                            <div id="qc_url_alert" class="alert alert-danger d-none mt-2" style="font-size: 0.8rem; padding: 0.45rem 0.75rem; border-radius: 6px; margin-bottom: 0;">
+                                <i data-lucide="alert-circle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                                <span id="qc_url_alert_text">This URL already exists.</span>
+                            </div>
+                            <div id="qc_url_success" class="text-success d-none mt-1" style="font-size: 0.78rem; font-weight: 500;">
+                                <i data-lucide="check" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle;"></i> URL is available.
+                            </div>
                         </div>
 
                         {{-- Contact Person Name --}}
@@ -228,6 +238,7 @@ window.handleQuickAddClientSubmit = function(e) {
         alertBox.classList.add('d-none');
         alertBox.innerHTML = '';
     }
+    if (urlInput) urlInput.classList.remove('is-invalid');
 
     const companyVal = companyInput ? companyInput.value.trim() : '';
     const urlVal = urlInput ? urlInput.value.trim() : '';
@@ -282,6 +293,9 @@ window.handleQuickAddClientSubmit = function(e) {
             if (data.errors) {
                 const errorList = Object.values(data.errors).flat().join('<br>');
                 errorMsg = errorList || errorMsg;
+                if (data.errors.system_url && urlInput) {
+                    urlInput.classList.add('is-invalid');
+                }
             }
             throw new Error(errorMsg);
         }
@@ -303,6 +317,10 @@ window.handleQuickAddClientSubmit = function(e) {
 
             const form = document.getElementById('quickAddClientForm');
             if (form) form.reset();
+            const qcAlert = document.getElementById('qc_url_alert');
+            const qcSuccess = document.getElementById('qc_url_success');
+            if (qcAlert) qcAlert.classList.add('d-none');
+            if (qcSuccess) qcSuccess.classList.add('d-none');
 
             const modalElement = document.getElementById('quickAddClientModal');
             if (modalElement) {
@@ -325,7 +343,7 @@ window.handleQuickAddClientSubmit = function(e) {
     })
     .catch(err => {
         if (alertBox) {
-            alertBox.innerHTML = err.message || 'Something went wrong. Please try again.';
+            alertBox.innerHTML = '<strong>Alert:</strong> ' + (err.message || 'Something went wrong. Please try again.');
             alertBox.classList.remove('d-none');
         }
     })
@@ -347,6 +365,68 @@ document.addEventListener('DOMContentLoaded', function() {
         quickForm.addEventListener('submit', function(e) {
             e.preventDefault();
             window.handleQuickAddClientSubmit(e);
+        });
+    }
+
+    const qcUrl = document.getElementById('qc_system_url');
+    const qcSpinner = document.getElementById('qc_url_spinner');
+    const qcAlert = document.getElementById('qc_url_alert');
+    const qcAlertText = document.getElementById('qc_url_alert_text');
+    const qcSuccess = document.getElementById('qc_url_success');
+    let qcTimer = null;
+
+    if (qcUrl) {
+        qcUrl.addEventListener('input', function() {
+            clearTimeout(qcTimer);
+            const val = this.value.trim();
+            if (!val) {
+                if (qcAlert) qcAlert.classList.add('d-none');
+                if (qcSuccess) qcSuccess.classList.add('d-none');
+                qcUrl.classList.remove('is-invalid');
+                return;
+            }
+            qcTimer = setTimeout(() => {
+                checkQuickClientUrl(val);
+            }, 350);
+        });
+
+        qcUrl.addEventListener('blur', function() {
+            const val = this.value.trim();
+            if (val) checkQuickClientUrl(val);
+        });
+    }
+
+    function checkQuickClientUrl(url) {
+        if (qcSpinner) qcSpinner.classList.remove('d-none');
+
+        fetch(`{{ route('clients.check-url') }}?url=${encodeURIComponent(url)}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (qcSpinner) qcSpinner.classList.add('d-none');
+            if (data.exists) {
+                qcUrl.classList.add('is-invalid');
+                if (qcSuccess) qcSuccess.classList.add('d-none');
+                if (qcAlert && qcAlertText) {
+                    qcAlertText.textContent = data.message || 'This URL already exists! (Already exist)';
+                    qcAlert.classList.remove('d-none');
+                }
+                if (window.lucide) lucide.createIcons();
+            } else {
+                qcUrl.classList.remove('is-invalid');
+                if (qcAlert) qcAlert.classList.add('d-none');
+                if (qcSuccess) {
+                    qcSuccess.classList.remove('d-none');
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
+        })
+        .catch(() => {
+            if (qcSpinner) qcSpinner.classList.add('d-none');
         });
     }
 });

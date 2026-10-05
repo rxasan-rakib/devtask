@@ -102,5 +102,10 @@
     </table>
     </div>
 </div>
-<div class="mt-3">{{ $users->links() }}</div>
+
+@if($users->hasPages())
+    <div class="mt-4">
+        {{ $users->links() }}
+    </div>
+@endif
 @endsection

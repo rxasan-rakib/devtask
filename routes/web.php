@@ -43,11 +43,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/tasks/kanban/view', [TaskController::class, 'kanban'])->name('tasks.kanban');
     Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.status');
     Route::patch('/tasks/{task}/assign', [TaskController::class, 'updateAssignee'])->name('tasks.assign');
+    Route::post('/tasks/{task}/attachments', [TaskController::class, 'uploadAttachment'])->name('tasks.attachments.store');
+    Route::get('/tasks/{task}/attachments/{attachment}/view', [TaskController::class, 'viewAttachment'])->name('tasks.attachments.view');
+    Route::get('/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
+    Route::delete('/tasks/{task}/attachments/{attachment}', [TaskController::class, 'deleteAttachment'])->name('tasks.attachments.destroy');
     Route::post('/tasks/{task}/comments', [TaskController::class, 'addComment'])->name('tasks.comments.store');
     Route::delete('/tasks/{task}/comments/{comment}', [TaskController::class, 'deleteComment'])->name('tasks.comments.destroy');
     Route::resource('tasks', TaskController::class);
 
     // Clients
+    Route::get('/clients/check-url', [ClientController::class, 'checkUrl'])->name('clients.check-url');
     Route::resource('clients', ClientController::class);
 
     // Reminders

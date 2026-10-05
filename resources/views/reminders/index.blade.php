@@ -325,7 +325,7 @@
 
 {{-- Pagination --}}
 @if($reminders->hasPages())
-    <div class="mt-4 d-flex justify-content-center">
+    <div class="mt-4">
         {{ $reminders->links() }}
     </div>
 @endif

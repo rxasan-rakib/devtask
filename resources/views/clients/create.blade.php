@@ -39,13 +39,21 @@
                     <div class="col-md-6">
                         <label class="form-label-enhanced">System URL <span class="req">*</span></label>
                         <div class="position-relative">
-                            <input type="text" name="system_url"
+                            <input type="text" name="system_url" id="client_system_url"
                                 class="form-control form-control-dark @error('system_url') is-invalid @enderror"
                                 placeholder="https://pos.clientdomain.com or https://clientwebsite.com"
-                                value="{{ old('system_url') }}" required>
+                                value="{{ old('system_url') }}" required autocomplete="off">
+                            <span id="urlCheckSpinner" class="spinner-border spinner-border-sm position-absolute end-0 top-50 translate-middle-y me-3 d-none" style="width: 14px; height: 14px; color: var(--accent);" role="status"></span>
+                        </div>
+                        <div id="urlCheckAlert" class="alert alert-danger d-none mt-2" style="font-size: 0.8rem; padding: 0.5rem 0.75rem; border-radius: 8px; margin-bottom: 0;">
+                            <i data-lucide="alert-circle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                            <span id="urlAlertText">This URL already exists.</span>
+                        </div>
+                        <div id="urlSuccessFeedback" class="text-success d-none mt-1" style="font-size: 0.78rem; font-weight: 500;">
+                            <i data-lucide="check" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle;"></i> URL is available.
                         </div>
                         @error('system_url')
-                            <div class="invalid-feedback" style="font-size:.75rem;color:var(--danger);margin-top:.25rem;">{{ $message }}</div>
+                            <div class="invalid-feedback d-block" style="font-size:.75rem;color:var(--danger);margin-top:.25rem;">{{ $message }}</div>
                         @enderror
                     </div>
 
@@ -102,7 +110,7 @@
                     Save & Actions
                 </div>
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn-gradient justify-content-center py-2">
+                    <button type="submit" id="submitClientBtn" class="btn-gradient justify-content-center py-2">
                         <i data-lucide="user-plus" style="width:16px;height:16px;"></i> Add Client
                     </button>
                     <a href="{{ route('clients.index') }}" class="btn-ghost justify-content-center py-2">
@@ -114,3 +122,76 @@
     </div>
 </form>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const urlInput = document.getElementById('client_system_url');
+    const spinner = document.getElementById('urlCheckSpinner');
+    const alertBox = document.getElementById('urlCheckAlert');
+    const alertText = document.getElementById('urlAlertText');
+    const successFeedback = document.getElementById('urlSuccessFeedback');
+    const submitBtn = document.getElementById('submitClientBtn');
+    let debounceTimer = null;
+
+    if (urlInput) {
+        urlInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const val = this.value.trim();
+
+            if (!val) {
+                if (alertBox) alertBox.classList.add('d-none');
+                if (successFeedback) successFeedback.classList.add('d-none');
+                urlInput.classList.remove('is-invalid');
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                checkUrlUniqueness(val);
+            }, 350);
+        });
+
+        urlInput.addEventListener('blur', function() {
+            const val = this.value.trim();
+            if (val) {
+                checkUrlUniqueness(val);
+            }
+        });
+    }
+
+    function checkUrlUniqueness(url) {
+        if (spinner) spinner.classList.remove('d-none');
+
+        fetch(`{{ route('clients.check-url') }}?url=${encodeURIComponent(url)}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (spinner) spinner.classList.add('d-none');
+            if (data.exists) {
+                urlInput.classList.add('is-invalid');
+                if (successFeedback) successFeedback.classList.add('d-none');
+                if (alertBox && alertText) {
+                    alertText.textContent = data.message || 'This URL already exists! (Already exist)';
+                    alertBox.classList.remove('d-none');
+                }
+                if (window.lucide) lucide.createIcons();
+            } else {
+                urlInput.classList.remove('is-invalid');
+                if (alertBox) alertBox.classList.add('d-none');
+                if (successFeedback) {
+                    successFeedback.classList.remove('d-none');
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
+        })
+        .catch(() => {
+            if (spinner) spinner.classList.add('d-none');
+        });
+    }
+});
+</script>
+@endpush

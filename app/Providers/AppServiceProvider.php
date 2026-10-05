@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Setting;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\PermissionRegistrar;
@@ -25,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Use Bootstrap 5 for clean and responsive pagination across all views
+        Paginator::useBootstrapFive();
+
         // Implicitly grant 'super-admin' role or designated super admin emails all permissions
         Gate::before(function ($user, $ability) {
             return ($user->hasRole('super-admin') || in_array(strtolower($user->email ?? ''), ['support.fastit@gmail.com', 'admin@workflowpro.com'])) ? true : null;

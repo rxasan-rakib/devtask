@@ -322,7 +322,7 @@
 
 {{-- Pagination --}}
 @if($clients->hasPages())
-    <div class="mt-4 d-flex justify-content-center">
+    <div class="mt-4">
         {{ $clients->links() }}
     </div>
 @endif

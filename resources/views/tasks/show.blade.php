@@ -268,7 +268,103 @@
             @endif
         </div>
 
-        {{-- 3. Comments & Discussion Card --}}
+        {{-- 3. Task Images & Attachments Card --}}
+        <div class="card-glass mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" style="border-color: var(--border) !important;">
+                <div class="section-title mb-0 d-flex align-items-center gap-2">
+                    <i data-lucide="images" style="width: 17px; height: 17px; color: #ff7828;"></i>
+                    Task Images & Attachments
+                    <span class="badge" style="background: rgba(255,120,40,0.12); color: #ff7828; font-size: 0.72rem; padding: 3px 8px; border-radius: 10px;">
+                        {{ $task->attachments->count() }}
+                    </span>
+                </div>
+                <button type="button" class="btn-ghost" style="padding: .3rem .75rem; font-size: .76rem;" onclick="document.getElementById('uploadCollapse').classList.toggle('d-none')">
+                    <i data-lucide="plus" style="width: 13px; height: 13px;"></i> Add Images
+                </button>
+            </div>
+
+            {{-- Quick Upload Form (Toggleable or always handy) --}}
+            <div id="uploadCollapse" class="{{ $task->attachments->count() == 0 ? '' : 'd-none' }} mb-3 p-3 rounded" style="background: rgba(99,102,241,0.03); border: 1px dashed var(--accent);">
+                <form method="POST" action="{{ route('tasks.attachments.store', $task) }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="image-upload-dropzone mb-2" id="taskShowDropzone" onclick="document.getElementById('showImagesInput').click()">
+                        <input type="file" name="images[]" id="showImagesInput" multiple accept="image/*,.pdf,.doc,.docx,.zip" style="display:none;">
+                        <i data-lucide="cloud-upload" style="width: 24px; height: 24px; color: var(--accent); margin-bottom: 4px;"></i>
+                        <div style="font-weight: 650; font-size: 0.84rem; color: var(--text-primary);">Click or Drag & Drop to upload images</div>
+                        <div style="font-size: 0.70rem; color: var(--text-muted);">Multiple files supported. Images are automatically compressed & optimized.</div>
+                    </div>
+                    <div id="showImagePreviewContainer" class="preview-cards-grid mb-2" style="display: none;"></div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn-ghost btn-sm" onclick="document.getElementById('uploadCollapse').classList.add('d-none')">Cancel</button>
+                        <button type="submit" class="btn-gradient btn-sm" style="padding: .35rem .9rem; font-size: .80rem;">
+                            <i data-lucide="upload" style="width: 13px; height: 13px;"></i> Upload Files
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {{-- Image Gallery Grid --}}
+            @if($task->attachments->count() > 0)
+                <div class="task-gallery-grid">
+                    @foreach($task->attachments as $attachment)
+                        <div class="task-gallery-item" id="attach-item-{{ $attachment->id }}">
+                            @if($attachment->is_image)
+                                <div class="task-gallery-thumb" onclick="openImageLightbox('{{ $attachment->url }}', '{{ addslashes($attachment->file_name) }}', '{{ $attachment->formatted_size }}', '{{ $attachment->user->name ?? 'User' }}', '{{ $attachment->created_at->format('d M Y, h:i A') }}', '{{ $attachment->download_url }}')">
+                                    <img src="{{ $attachment->url }}" alt="{{ $attachment->file_name }}" loading="lazy">
+                                    <div class="task-gallery-overlay">
+                                        <i data-lucide="maximize-2" style="width: 22px; height: 22px;"></i>
+                                    </div>
+                                </div>
+                            @else
+                                <a href="{{ $attachment->download_url }}" target="_blank" class="task-gallery-thumb d-flex align-items-center justify-content-center text-decoration-none" style="background: rgba(99,102,241,0.06);">
+                                    <div class="text-center text-accent">
+                                        <i data-lucide="{{ $attachment->icon }}" style="width: 36px; height: 36px; color: var(--accent);"></i>
+                                        <div style="font-size: 0.70rem; font-weight: 600; margin-top: 4px; color: var(--text-primary);">Document</div>
+                                    </div>
+                                </a>
+                            @endif
+
+                            <div class="task-gallery-footer">
+                                <div style="min-width: 0;">
+                                    <div class="task-gallery-name" title="{{ $attachment->file_name }}">
+                                        {{ $attachment->file_name }}
+                                    </div>
+                                    <div class="task-gallery-size">
+                                        {{ $attachment->formatted_size }}
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <a href="{{ $attachment->download_url }}" class="btn-icon" style="width: 26px; height: 26px;" title="Download">
+                                        <i data-lucide="download" style="width: 12px; height: 12px;"></i>
+                                    </a>
+                                    @php
+                                        $canDeleteAttach = auth()->user()->hasRole('super-admin') || auth()->user()->isDefaultSuperAdmin() || (int)$attachment->user_id === (int)auth()->id() || (int)$task->created_by === (int)auth()->id() || auth()->user()->can('edit tasks');
+                                    @endphp
+                                    @if($canDeleteAttach)
+                                        <button type="button" class="btn-icon text-danger" style="width: 26px; height: 26px; border-color: rgba(239,68,68,0.2);" title="Delete" onclick="deleteTaskAttachment({{ $task->id }}, {{ $attachment->id }})">
+                                            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-4 px-2" style="background: var(--bg-hover); border-radius: 8px; border: 1px dashed var(--border);">
+                    <i data-lucide="image" style="width: 32px; height: 32px; color: var(--text-muted); opacity: .4; margin-bottom: .4rem;"></i>
+                    <div style="font-weight: 600; font-size: .84rem; color: var(--text-primary);">No Images or Attachments</div>
+                    <p style="font-size: .78rem; color: var(--text-muted); max-width: 360px; margin: 0 auto .75rem;">
+                        No screenshots or work files have been attached to this task yet.
+                    </p>
+                    <button type="button" class="btn-gradient btn-sm" onclick="document.getElementById('uploadCollapse').classList.remove('d-none'); document.getElementById('showImagesInput').click();">
+                        <i data-lucide="upload" style="width: 13px; height: 13px;"></i> Upload Images Now
+                    </button>
+                </div>
+            @endif
+        </div>
+
+        {{-- 4. Comments & Discussion Card --}}
         <div class="card-glass">
             <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" style="border-color: var(--border) !important;">
                 <div class="section-title mb-0 d-flex align-items-center gap-2">
@@ -526,6 +622,33 @@
     </div>
 </div>
 
+{{-- Image Lightbox Modal --}}
+<div class="modal fade" id="imageLightboxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.96); border: 1px solid var(--border); backdrop-filter: blur(16px); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.75);">
+            <div class="modal-header border-bottom" style="border-color: var(--border) !important; padding: 0.85rem 1.25rem;">
+                <div class="d-flex align-items-center gap-2" style="min-width: 0;">
+                    <i data-lucide="image" style="width: 18px; height: 18px; color: var(--accent); flex-shrink: 0;"></i>
+                    <h5 class="modal-title text-truncate" id="lightboxTitle" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0;">Image Preview</h5>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a id="lightboxDownload" href="#" download class="btn-gradient btn-sm" style="padding: 0.35rem 0.8rem; font-size: 0.78rem;">
+                        <i data-lucide="download" style="width: 13px; height: 13px;"></i> Download HD
+                    </a>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(0.8);"></button>
+                </div>
+            </div>
+            <div class="modal-body text-center p-2 p-md-3" style="min-height: 250px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+                <img id="lightboxImage" src="" alt="Preview" style="max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            </div>
+            <div class="modal-footer border-top justify-content-between" style="border-color: var(--border) !important; padding: 0.65rem 1.25rem;">
+                <div id="lightboxMeta" style="font-size: 0.76rem; color: var(--text-muted);"></div>
+                <button type="button" class="btn-ghost btn-sm" data-bs-dismiss="modal" style="font-size: 0.78rem; padding: 0.3rem 0.8rem;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('styles')
@@ -543,6 +666,165 @@
 .activity-scroll-container::-webkit-scrollbar-thumb:hover {
     background: rgba(148, 163, 184, 0.45);
 }
+
+/* Gallery & Upload Dropzone Styles */
+.task-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.85rem;
+}
+.task-gallery-item {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+.task-gallery-item:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+}
+.task-gallery-thumb {
+    position: relative;
+    width: 100%;
+    height: 120px;
+    overflow: hidden;
+    cursor: pointer;
+    background: rgba(0,0,0,0.15);
+}
+.task-gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+.task-gallery-thumb:hover img {
+    transform: scale(1.05);
+}
+.task-gallery-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    color: #ffffff;
+}
+.task-gallery-thumb:hover .task-gallery-overlay {
+    opacity: 1;
+}
+.task-gallery-footer {
+    padding: 7px 9px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.task-gallery-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 95px;
+}
+.task-gallery-size {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+}
+
+.image-upload-dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1rem;
+    text-align: center;
+    background: rgba(99, 102, 241, 0.02);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+}
+.image-upload-dropzone:hover,
+.image-upload-dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(99, 102, 241, 0.08);
+}
+.preview-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.65rem;
+    margin-top: 0.75rem;
+}
+.preview-card-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.preview-card-item img {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+.preview-card-item .file-placeholder {
+    width: 100%;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(99, 102, 241, 0.08);
+    border-radius: 6px;
+    color: var(--accent);
+}
+.preview-card-item .preview-info {
+    width: 100%;
+    margin-top: 4px;
+    text-align: center;
+}
+.preview-card-item .preview-name {
+    font-size: 0.70rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+.preview-card-item .preview-size {
+    font-size: 0.64rem;
+    color: var(--text-muted);
+}
+.preview-card-item .btn-remove-preview {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 20px;
+    height: 20px;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    z-index: 5;
+}
 </style>
 @endpush
 
@@ -554,5 +836,159 @@ function toggleAssignForm() {
         form.classList.toggle('d-none');
     }
 }
+
+// Open Lightbox
+function openImageLightbox(url, title, size, uploader, date, downloadUrl) {
+    const modalEl = document.getElementById('imageLightboxModal');
+    if (!modalEl) return;
+
+    document.getElementById('lightboxImage').src = url;
+    document.getElementById('lightboxTitle').textContent = title;
+    document.getElementById('lightboxDownload').href = downloadUrl || url;
+    document.getElementById('lightboxDownload').setAttribute('download', title);
+    document.getElementById('lightboxMeta').innerHTML = `<strong>Uploaded by:</strong> ${uploader} • <strong>Size:</strong> ${size} • <strong>Date:</strong> ${date}`;
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    if (window.lucide) lucide.createIcons();
+}
+
+// Delete Attachment via AJAX
+function deleteTaskAttachment(taskId, attachmentId) {
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    fetch(`/tasks/${taskId}/attachments/${attachmentId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': token
+        }
+    })
+    .then(async res => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to delete attachment');
+        return data;
+    })
+    .then(data => {
+        const item = document.getElementById(`attach-item-${attachmentId}`);
+        if (item) item.remove();
+        if (window.showToast) window.showToast('Attachment deleted successfully', 'success');
+    })
+    .catch(err => {
+        if (window.showToast) window.showToast(err.message || 'Error deleting attachment', 'error');
+        else alert(err.message || 'Error deleting attachment');
+    });
+}
+
+// Multi-Image Upload Manager for Show page
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('showImagesInput');
+    const dropzone = document.getElementById('taskShowDropzone');
+    const previewContainer = document.getElementById('showImagePreviewContainer');
+    if (!fileInput || !dropzone || !previewContainer) return;
+
+    let dt = new DataTransfer();
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function updatePreviews() {
+        previewContainer.innerHTML = '';
+        if (dt.items.length === 0) {
+            previewContainer.style.display = 'none';
+            fileInput.files = dt.files;
+            return;
+        }
+
+        previewContainer.style.display = 'grid';
+
+        Array.from(dt.files).forEach((file, index) => {
+            const card = document.createElement('div');
+            card.className = 'preview-card-item';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-remove-preview';
+            removeBtn.innerHTML = '×';
+            removeBtn.title = 'Remove this image';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dt.items.remove(index);
+                fileInput.files = dt.files;
+                updatePreviews();
+            });
+
+            const isImg = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name);
+            if (isImg) {
+                const img = document.createElement('img');
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                card.appendChild(img);
+            } else {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'file-placeholder';
+                placeholder.innerHTML = '<i data-lucide="file-text" style="width:20px;height:20px;"></i>';
+                card.appendChild(placeholder);
+            }
+
+            const info = document.createElement('div');
+            info.className = 'preview-info';
+            info.innerHTML = `
+                <span class="preview-name" title="${file.name}">${file.name}</span>
+                <span class="preview-size">${formatBytes(file.size)}</span>
+            `;
+
+            card.appendChild(removeBtn);
+            card.appendChild(info);
+            previewContainer.appendChild(card);
+        });
+
+        fileInput.files = dt.files;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    fileInput.addEventListener('change', () => {
+        for (let i = 0; i < fileInput.files.length; i++) {
+            dt.items.add(fileInput.files[i]);
+        }
+        updatePreviews();
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+        });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        const droppedFiles = e.dataTransfer.files;
+        if (droppedFiles.length > 0) {
+            for (let i = 0; i < droppedFiles.length; i++) {
+                dt.items.add(droppedFiles[i]);
+            }
+            updatePreviews();
+        }
+    });
+});
 </script>
 @endpush
