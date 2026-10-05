@@ -171,6 +171,11 @@
     box-shadow: var(--shadow-dropdown);
     scrollbar-width: thin;
 }
+.searchable-dropdown-list.dropup {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.4);
+}
 .searchable-dropdown-list::-webkit-scrollbar {
     width: 5px;
 }
@@ -839,14 +844,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function updateDropdownPosition() {
+        const rect = wrap.getBoundingClientRect();
+        const menuHeight = 250;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+            menu.classList.add('dropup');
+        } else {
+            menu.classList.remove('dropup');
+        }
+    }
+
     // Open dropdown on focus/click
     input.addEventListener('focus', () => {
         menu.style.display = 'block';
+        updateDropdownPosition();
         filterItems(input.value);
     });
 
     input.addEventListener('click', () => {
         menu.style.display = 'block';
+        updateDropdownPosition();
     });
 
     // Real-time typing in Client field
@@ -900,6 +920,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', (e) => {
         if (!wrap.contains(e.target)) {
             menu.style.display = 'none';
+            menu.classList.remove('dropup');
         }
     });
 

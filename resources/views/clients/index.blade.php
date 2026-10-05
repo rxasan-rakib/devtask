@@ -276,12 +276,21 @@
                                 </a>
                                 @endcan
                                 @can('delete clients')
-                                <form method="POST" action="{{ route('clients.destroy', $client) }}" onsubmit="return confirm('Delete client {{ $client->company_name }}?')">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn-icon" style="width:32px; height:32px; color:#ef4444; border-color:rgba(239,68,68,.2);" title="Delete Client">
+                                @php
+                                    $hasHistory = ($client->tasks_count ?? $client->tasks->count()) > 0 || ($client->reminders_count ?? $client->reminders->count()) > 0;
+                                @endphp
+                                @if($hasHistory)
+                                    <button type="button" class="btn-icon" style="width:32px; height:32px; color:var(--text-muted); opacity:0.35; cursor:not-allowed;" title="Cannot delete: Client has active or past tasks/reminders" disabled>
                                         <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
                                     </button>
-                                </form>
+                                @else
+                                    <form method="POST" action="{{ route('clients.destroy', $client) }}" onsubmit="return confirm('Delete client {{ $client->company_name }}?')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="btn-icon" style="width:32px; height:32px; color:#ef4444; border-color:rgba(239,68,68,.2);" title="Delete Client">
+                                            <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
+                                        </button>
+                                    </form>
+                                @endif
                                 @endcan
                             </div>
                         </td>

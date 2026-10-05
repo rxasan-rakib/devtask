@@ -16,7 +16,7 @@ class ClientController extends Controller
         $user = Auth::user();
         abort_if(!$user->can('view clients'), 403, 'Unauthorized access to client directory.');
 
-        $query = Client::with(['createdBy', 'tasks']);
+        $query = Client::with(['createdBy', 'tasks'])->withCount(['tasks', 'reminders']);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -272,7 +272,24 @@ class ClientController extends Controller
         $user = Auth::user();
         abort_if(!$user->can('delete clients'), 403, 'Unauthorized to delete client.');
 
+        $taskCount = $client->tasks()->withTrashed()->count();
+        $reminderCount = $client->reminders()->count();
+
+        if ($taskCount > 0 || $reminderCount > 0) {
+            $details = [];
+            if ($taskCount > 0) {
+                $details[] = "{$taskCount} task(s)";
+            }
+            if ($reminderCount > 0) {
+                $details[] = "{$reminderCount} reminder(s)";
+            }
+            $historyStr = implode(' and ', $details);
+
+            return redirect()->route('clients.index')
+                ->with('error', "Cannot delete client '{$client->company_name}'. This client has {$historyStr} associated with it in history.");
+        }
+
         $client->delete();
-        return redirect()->route('clients.index')->with('success', 'Client deleted.');
+        return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');
     }
 }

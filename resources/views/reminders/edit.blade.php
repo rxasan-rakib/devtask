@@ -2,6 +2,63 @@
 @section('title', 'Edit Reminder')
 @section('page-title', 'Edit Reminder')
 
+@push('styles')
+<style>
+/* Searchable Client Dropdown */
+.searchable-select-wrap {
+    position: relative;
+}
+.searchable-dropdown-list {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 1060;
+    background: var(--dropdown-bg, #1e293b);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-dropdown, 0 10px 25px -5px rgba(0, 0, 0, 0.4));
+    scrollbar-width: thin;
+}
+.searchable-dropdown-list.dropup {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.4);
+}
+.searchable-dropdown-list::-webkit-scrollbar {
+    width: 5px;
+}
+.searchable-dropdown-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+.searchable-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.83rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+    transition: all 0.15s ease;
+}
+.searchable-item:last-child {
+    border-bottom: none;
+}
+.searchable-item:hover,
+.searchable-item.focused {
+    background: var(--bg-hover, rgba(255,255,255,0.06)) !important;
+    color: var(--text-primary) !important;
+}
+.searchable-item.selected {
+    background: rgba(99, 102, 241, 0.14) !important;
+    color: var(--accent, #6366f1) !important;
+    font-weight: 600;
+}
+</style>
+@endpush
+
 @section('content')
 <div class="page-header">
     <div class="page-header-left">
@@ -49,13 +106,77 @@
                 <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label-enhanced">Related Client</label>
-                        <div class="d-flex align-items-stretch" style="width: 100%;">
-                            <select name="client_id" id="reminder_client_id" class="form-select form-select-dark" style="flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0;">
-                                <option value="">No client (General reminder)</option>
-                                @foreach($clients as $client)
-                                    <option value="{{ $client->id }}" {{ old('client_id', $reminder->client_id)==$client->id ? 'selected' : '' }}>{{ $client->company_name ?? $client->name }} @if($client->name && $client->name !== $client->company_name)({{ $client->name }})@endif</option>
-                                @endforeach
-                            </select>
+                        @php
+                            $selectedClientId = old('client_id', $reminder->client_id);
+                            $selectedClient = $selectedClientId ? $clients->firstWhere('id', $selectedClientId) : null;
+                            $selectedClientName = '';
+                            if ($selectedClient) {
+                                $cName = $selectedClient->company_name ?: $selectedClient->name;
+                                $selectedClientName = $cName . (($selectedClient->name && $selectedClient->name !== $selectedClient->company_name) ? ' (' . $selectedClient->name . ')' : '');
+                            }
+                        @endphp
+                        <div class="searchable-select-wrap d-flex align-items-stretch" id="reminderClientSelectWrapper" style="width: 100%; position: relative;">
+                            <div style="position: relative; flex: 1; min-width: 0;">
+                                <i data-lucide="building-2" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-muted);pointer-events:none;z-index:2;"></i>
+                                
+                                <input type="text" 
+                                       id="reminderClientSearchInput" 
+                                       class="form-control form-control-dark @error('client_id') is-invalid @enderror" 
+                                       style="padding-left:34px;padding-right:54px;border-top-right-radius:0;border-bottom-right-radius:0;cursor:pointer;" 
+                                       placeholder="No client (General reminder) - Search or select..." 
+                                       autocomplete="off"
+                                       value="{{ $selectedClientName }}">
+
+                                <input type="hidden" name="client_id" id="reminder_client_id" value="{{ $selectedClientId }}">
+
+                                <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px;z-index:3;">
+                                    <button type="button" 
+                                            id="reminderClientClearBtn" 
+                                            style="padding:2px 4px;border:none;background:transparent;color:var(--text-muted);display:{{ $selectedClientId ? 'block' : 'none' }};cursor:pointer;" 
+                                            title="Clear client selection">
+                                        <i data-lucide="x" style="width:13px;height:13px;"></i>
+                                    </button>
+                                    <i data-lucide="chevron-down" id="reminderClientChevron" style="width:14px;height:14px;color:var(--text-muted);pointer-events:none;transition:transform .2s;"></i>
+                                </div>
+
+                                {{-- Dropdown Menu --}}
+                                <div id="reminderClientDropdownMenu" class="searchable-dropdown-list">
+                                    <div class="searchable-item {{ !$selectedClientId ? 'selected' : '' }}" 
+                                         data-id="" 
+                                         data-name="" 
+                                         data-search="no client general reminder none" 
+                                         style="font-weight:600; color:var(--text-muted); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px;">
+                                        <i data-lucide="minus-circle" style="width:13px;height:13px;"></i> No client (General reminder)
+                                    </div>
+                                    @foreach($clients as $client)
+                                        @php 
+                                            $cName = $client->company_name ?: $client->name;
+                                            $cSub = ($client->company_name && $client->name && $client->name !== $client->company_name) ? $client->name : ($client->phone ?: $client->system_url);
+                                            $cDisplay = $cName . (($client->name && $client->name !== $client->company_name) ? ' (' . $client->name . ')' : '');
+                                            $isSelected = ($selectedClientId == $client->id);
+                                            $searchMeta = strtolower(($client->company_name ?? '') . ' ' . ($client->name ?? '') . ' ' . ($client->phone ?? '') . ' ' . ($client->system_url ?? '') . ' ' . ($client->email ?? ''));
+                                        @endphp
+                                        <div class="searchable-item {{ $isSelected ? 'selected' : '' }}" 
+                                             data-id="{{ $client->id }}" 
+                                             data-name="{{ $cDisplay }}" 
+                                             data-search="{{ $searchMeta }}">
+                                            <div style="font-weight:600; color:var(--text-primary);">
+                                                {{ $client->company_name ?? $client->name }}
+                                                @if($client->name && $client->name !== $client->company_name)
+                                                    <span style="font-weight:400; color:var(--text-muted); font-size:0.75rem;">({{ $client->name }})</span>
+                                                @endif
+                                            </div>
+                                            @if($cSub && $cSub !== $client->name)
+                                                <div style="font-size:.70rem; color:var(--text-muted);">{{ $cSub }}</div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                    <div id="noReminderClientMatch" style="display:none; padding:10px 12px; font-size:.80rem; color:var(--text-muted); text-align:center;">
+                                        No matching clients found
+                                    </div>
+                                </div>
+                            </div>
+
                             <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#quickAddClientModal" style="flex-shrink: 0; background: rgba(255,120,40,0.15); border: 1px solid var(--border); border-left: none; color: #ff7828; border-top-left-radius: 0; border-bottom-left-radius: 0; border-top-right-radius: 8px; border-bottom-right-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 14px; transition: all .2s;" title="Add New Client">
                                 <i data-lucide="plus" style="width: 18px; height: 18px; stroke-width: 2.5;"></i>
                             </button>
@@ -303,16 +424,15 @@ window.handleQuickAddClientSubmit = function(e) {
     })
     .then(result => {
         if (result.success && result.client) {
-            const clientSelect = document.getElementById('reminder_client_id') || document.querySelector('select[name="client_id"]');
-            if (clientSelect) {
-                const newOption = document.createElement('option');
-                newOption.value = result.client.id;
-                newOption.textContent = result.client.display_name;
-                newOption.selected = true;
-
-                clientSelect.appendChild(newOption);
-                clientSelect.value = result.client.id;
-                clientSelect.dispatchEvent(new Event('change'));
+            if (window.reminderSelectClient) {
+                window.reminderSelectClient(result.client.id, result.client.display_name || result.client.company_name || result.client.name);
+            } else {
+                const clientHidden = document.getElementById('reminder_client_id');
+                const clientInput = document.getElementById('reminderClientSearchInput');
+                const clientClearBtn = document.getElementById('reminderClientClearBtn');
+                if (clientHidden) clientHidden.value = result.client.id;
+                if (clientInput) clientInput.value = result.client.display_name || result.client.company_name || result.client.name;
+                if (clientClearBtn) clientClearBtn.style.display = 'block';
             }
 
             const form = document.getElementById('quickAddClientForm');
@@ -360,6 +480,230 @@ window.handleQuickAddClientSubmit = function(e) {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Searchable Client Dropdown Handler
+    (function() {
+        const wrap = document.getElementById('reminderClientSelectWrapper');
+        const input = document.getElementById('reminderClientSearchInput');
+        const hiddenId = document.getElementById('reminder_client_id');
+        const menu = document.getElementById('reminderClientDropdownMenu');
+        const clearBtn = document.getElementById('reminderClientClearBtn');
+        const noMatch = document.getElementById('noReminderClientMatch');
+        const chevron = document.getElementById('reminderClientChevron');
+
+        if (!wrap || !input || !hiddenId || !menu) return;
+
+        let activeIndex = -1;
+
+        function getVisibleItems() {
+            return Array.from(menu.querySelectorAll('.searchable-item')).filter(el => el.style.display !== 'none');
+        }
+
+        function filterItems(query) {
+            const q = query.toLowerCase().trim();
+            const items = menu.querySelectorAll('.searchable-item');
+            let visibleCount = 0;
+
+            items.forEach(item => {
+                const id = item.getAttribute('data-id');
+                const searchStr = (item.getAttribute('data-search') || '').toLowerCase();
+                const nameStr = (item.getAttribute('data-name') || '').toLowerCase();
+
+                if (!q) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else if (id === '') {
+                    if (searchStr.includes(q)) {
+                        item.style.display = 'block';
+                        visibleCount++;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                } else if (searchStr.includes(q) || nameStr.includes(q)) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            if (noMatch) {
+                noMatch.style.display = visibleCount === 0 ? 'block' : 'none';
+            }
+            activeIndex = -1;
+            updateActiveItem();
+        }
+
+        function updateActiveItem() {
+            const visible = getVisibleItems();
+            visible.forEach((el, idx) => {
+                if (idx === activeIndex) {
+                    el.classList.add('focused');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('focused');
+                }
+            });
+        }
+
+        function updateDropdownPosition() {
+            const rect = wrap.getBoundingClientRect();
+            const menuHeight = 250;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+
+            if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                menu.classList.add('dropup');
+            } else {
+                menu.classList.remove('dropup');
+            }
+        }
+
+        function openDropdown() {
+            menu.style.display = 'block';
+            filterItems('');
+            updateDropdownPosition();
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+            
+            const currentId = hiddenId.value;
+            if (currentId) {
+                const selectedEl = menu.querySelector(`.searchable-item[data-id="${currentId}"]`);
+                if (selectedEl) {
+                    selectedEl.scrollIntoView({ block: 'nearest' });
+                }
+            }
+        }
+
+        function closeDropdown() {
+            menu.style.display = 'none';
+            menu.classList.remove('dropup');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+            activeIndex = -1;
+            updateActiveItem();
+        }
+
+        function selectClient(id, displayName) {
+            hiddenId.value = id || '';
+            input.value = displayName || '';
+            
+            const items = menu.querySelectorAll('.searchable-item');
+            items.forEach(i => {
+                if (i.getAttribute('data-id') == (id || '')) {
+                    i.classList.add('selected');
+                } else {
+                    i.classList.remove('selected');
+                }
+            });
+
+            if (clearBtn) {
+                clearBtn.style.display = id ? 'block' : 'none';
+            }
+
+            closeDropdown();
+        }
+
+        // Focus / Click opens dropdown and selects text for quick replacement
+        input.addEventListener('focus', () => {
+            openDropdown();
+            setTimeout(() => {
+                input.select();
+            }, 50);
+        });
+
+        input.addEventListener('click', (e) => {
+            if (menu.style.display !== 'block') {
+                openDropdown();
+                input.select();
+            }
+        });
+
+        // Real-time typing in Client field
+        input.addEventListener('input', () => {
+            if (menu.style.display !== 'block') {
+                menu.style.display = 'block';
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+            }
+            filterItems(input.value);
+            if (input.value.trim() === '') {
+                hiddenId.value = '';
+                if (clearBtn) clearBtn.style.display = 'none';
+            } else {
+                if (clearBtn) clearBtn.style.display = 'block';
+            }
+        });
+
+        // Keyboard navigation
+        input.addEventListener('keydown', (e) => {
+            const visible = getVisibleItems();
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (menu.style.display !== 'block') {
+                    openDropdown();
+                    return;
+                }
+                if (visible.length > 0) {
+                    activeIndex = (activeIndex + 1) % visible.length;
+                    updateActiveItem();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (menu.style.display !== 'block') {
+                    openDropdown();
+                    return;
+                }
+                if (visible.length > 0) {
+                    activeIndex = (activeIndex - 1 + visible.length) % visible.length;
+                    updateActiveItem();
+                }
+            } else if (e.key === 'Enter') {
+                if (menu.style.display === 'block' && activeIndex >= 0 && visible[activeIndex]) {
+                    e.preventDefault();
+                    const item = visible[activeIndex];
+                    selectClient(item.getAttribute('data-id'), item.getAttribute('data-name'));
+                }
+            } else if (e.key === 'Escape') {
+                closeDropdown();
+            }
+        });
+
+        // Client item selection delegation
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.searchable-item');
+            if (item) {
+                const id = item.getAttribute('data-id');
+                const name = item.getAttribute('data-name');
+                selectClient(id, name);
+            }
+        });
+
+        // Clear Client selection
+        if (clearBtn) {
+            clearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectClient('', '');
+                input.focus();
+            });
+        }
+
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!wrap.contains(e.target)) {
+                closeDropdown();
+                const currentId = hiddenId.value;
+                if (currentId) {
+                    const selectedItem = menu.querySelector(`.searchable-item[data-id="${currentId}"]`);
+                    if (selectedItem) {
+                        input.value = selectedItem.getAttribute('data-name') || '';
+                    }
+                } else if (!hiddenId.value) {
+                    input.value = '';
+                    if (clearBtn) clearBtn.style.display = 'none';
+                }
+            }
+        });
+
+        // Expose selectClient to window so Quick Add Client Modal can call it
+        window.reminderSelectClient = selectClient;
+    })();
     const quickForm = document.getElementById('quickAddClientForm');
     if (quickForm) {
         quickForm.addEventListener('submit', function(e) {

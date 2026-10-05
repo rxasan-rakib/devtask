@@ -258,9 +258,7 @@
                 Description & Task Scope
             </div>
             @if($task->description)
-                <div style="color: var(--text-primary); font-size: .88rem; line-height: 1.8; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 10px; padding: 1.15rem; white-space: pre-line;">
-                    {!! nl2br(e($task->description)) !!}
-                </div>
+                <div style="color: var(--text-primary); font-size: .88rem; line-height: 1.6; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 10px; padding: 1.15rem; white-space: pre-wrap; word-break: break-word;">{{ $task->description }}</div>
             @else
                 <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: .85rem; font-style: italic; background: var(--bg-hover); border-radius: 8px;">
                     No detailed description provided for this task.
@@ -268,7 +266,8 @@
             @endif
         </div>
 
-        {{-- 3. Task Images & Attachments Card --}}
+        {{-- 3. Task Images & Attachments Card (Only shown if attachments exist) --}}
+        @if($task->attachments->count() > 0)
         <div class="card-glass mb-4">
             <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" style="border-color: var(--border) !important;">
                 <div class="section-title mb-0 d-flex align-items-center gap-2">
@@ -283,8 +282,8 @@
                 </button>
             </div>
 
-            {{-- Quick Upload Form (Toggleable or always handy) --}}
-            <div id="uploadCollapse" class="{{ $task->attachments->count() == 0 ? '' : 'd-none' }} mb-3 p-3 rounded" style="background: rgba(99,102,241,0.03); border: 1px dashed var(--accent);">
+            {{-- Quick Upload Form (Toggleable) --}}
+            <div id="uploadCollapse" class="d-none mb-3 p-3 rounded" style="background: rgba(99,102,241,0.03); border: 1px dashed var(--accent);">
                 <form method="POST" action="{{ route('tasks.attachments.store', $task) }}" enctype="multipart/form-data">
                     @csrf
                     <div class="image-upload-dropzone mb-2" id="taskShowDropzone" onclick="document.getElementById('showImagesInput').click()">
@@ -304,65 +303,53 @@
             </div>
 
             {{-- Image Gallery Grid --}}
-            @if($task->attachments->count() > 0)
-                <div class="task-gallery-grid">
-                    @foreach($task->attachments as $attachment)
-                        <div class="task-gallery-item" id="attach-item-{{ $attachment->id }}">
-                            @if($attachment->is_image)
-                                <div class="task-gallery-thumb" onclick="openImageLightbox('{{ $attachment->url }}', '{{ addslashes($attachment->file_name) }}', '{{ $attachment->formatted_size }}', '{{ $attachment->user->name ?? 'User' }}', '{{ $attachment->created_at->format('d M Y, h:i A') }}', '{{ $attachment->download_url }}')">
-                                    <img src="{{ $attachment->url }}" alt="{{ $attachment->file_name }}" loading="lazy">
-                                    <div class="task-gallery-overlay">
-                                        <i data-lucide="maximize-2" style="width: 22px; height: 22px;"></i>
-                                    </div>
-                                </div>
-                            @else
-                                <a href="{{ $attachment->download_url }}" target="_blank" class="task-gallery-thumb d-flex align-items-center justify-content-center text-decoration-none" style="background: rgba(99,102,241,0.06);">
-                                    <div class="text-center text-accent">
-                                        <i data-lucide="{{ $attachment->icon }}" style="width: 36px; height: 36px; color: var(--accent);"></i>
-                                        <div style="font-size: 0.70rem; font-weight: 600; margin-top: 4px; color: var(--text-primary);">Document</div>
-                                    </div>
-                                </a>
-                            @endif
-
-                            <div class="task-gallery-footer">
-                                <div style="min-width: 0;">
-                                    <div class="task-gallery-name" title="{{ $attachment->file_name }}">
-                                        {{ $attachment->file_name }}
-                                    </div>
-                                    <div class="task-gallery-size">
-                                        {{ $attachment->formatted_size }}
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <a href="{{ $attachment->download_url }}" class="btn-icon" style="width: 26px; height: 26px;" title="Download">
-                                        <i data-lucide="download" style="width: 12px; height: 12px;"></i>
-                                    </a>
-                                    @php
-                                        $canDeleteAttach = auth()->user()->hasRole('super-admin') || auth()->user()->isDefaultSuperAdmin() || (int)$attachment->user_id === (int)auth()->id() || (int)$task->created_by === (int)auth()->id() || auth()->user()->can('edit tasks');
-                                    @endphp
-                                    @if($canDeleteAttach)
-                                        <button type="button" class="btn-icon text-danger" style="width: 26px; height: 26px; border-color: rgba(239,68,68,0.2);" title="Delete" onclick="deleteTaskAttachment({{ $task->id }}, {{ $attachment->id }})">
-                                            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
-                                        </button>
-                                    @endif
+            <div class="task-gallery-grid">
+                @foreach($task->attachments as $attachment)
+                    <div class="task-gallery-item" id="attach-item-{{ $attachment->id }}">
+                        @if($attachment->is_image)
+                            <div class="task-gallery-thumb" onclick="openImageLightbox('{{ $attachment->url }}', '{{ addslashes($attachment->file_name) }}', '{{ $attachment->formatted_size }}', '{{ $attachment->user->name ?? 'User' }}', '{{ $attachment->created_at->format('d M Y, h:i A') }}', '{{ $attachment->download_url }}')">
+                                <img src="{{ $attachment->url }}" alt="{{ $attachment->file_name }}" loading="lazy">
+                                <div class="task-gallery-overlay">
+                                    <i data-lucide="maximize-2" style="width: 22px; height: 22px;"></i>
                                 </div>
                             </div>
+                        @else
+                            <a href="{{ $attachment->download_url }}" target="_blank" class="task-gallery-thumb d-flex align-items-center justify-content-center text-decoration-none" style="background: rgba(99,102,241,0.06);">
+                                <div class="text-center text-accent">
+                                    <i data-lucide="{{ $attachment->icon }}" style="width: 36px; height: 36px; color: var(--accent);"></i>
+                                    <div style="font-size: 0.70rem; font-weight: 600; margin-top: 4px; color: var(--text-primary);">Document</div>
+                                </div>
+                            </a>
+                        @endif
+
+                        <div class="task-gallery-footer">
+                            <div style="min-width: 0;">
+                                <div class="task-gallery-name" title="{{ $attachment->file_name }}">
+                                    {{ $attachment->file_name }}
+                                </div>
+                                <div class="task-gallery-size">
+                                    {{ $attachment->formatted_size }}
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <a href="{{ $attachment->download_url }}" class="btn-icon" style="width: 26px; height: 26px;" title="Download">
+                                    <i data-lucide="download" style="width: 12px; height: 12px;"></i>
+                                </a>
+                                @php
+                                    $canDeleteAttach = auth()->user()->hasRole('super-admin') || auth()->user()->isDefaultSuperAdmin() || (int)$attachment->user_id === (int)auth()->id() || (int)$task->created_by === (int)auth()->id() || auth()->user()->can('edit tasks');
+                                @endphp
+                                @if($canDeleteAttach)
+                                    <button type="button" class="btn-icon text-danger" style="width: 26px; height: 26px; border-color: rgba(239,68,68,0.2);" title="Delete" onclick="deleteTaskAttachment({{ $task->id }}, {{ $attachment->id }})">
+                                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                                    </button>
+                                @endif
+                            </div>
                         </div>
-                    @endforeach
-                </div>
-            @else
-                <div class="text-center py-4 px-2" style="background: var(--bg-hover); border-radius: 8px; border: 1px dashed var(--border);">
-                    <i data-lucide="image" style="width: 32px; height: 32px; color: var(--text-muted); opacity: .4; margin-bottom: .4rem;"></i>
-                    <div style="font-weight: 600; font-size: .84rem; color: var(--text-primary);">No Images or Attachments</div>
-                    <p style="font-size: .78rem; color: var(--text-muted); max-width: 360px; margin: 0 auto .75rem;">
-                        No screenshots or work files have been attached to this task yet.
-                    </p>
-                    <button type="button" class="btn-gradient btn-sm" onclick="document.getElementById('uploadCollapse').classList.remove('d-none'); document.getElementById('showImagesInput').click();">
-                        <i data-lucide="upload" style="width: 13px; height: 13px;"></i> Upload Images Now
-                    </button>
-                </div>
-            @endif
+                    </div>
+                @endforeach
+            </div>
         </div>
+        @endif
 
         {{-- 4. Comments & Discussion Card --}}
         <div class="card-glass">

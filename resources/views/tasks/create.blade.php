@@ -117,6 +117,11 @@
     box-shadow: var(--shadow-dropdown, 0 10px 25px -5px rgba(0, 0, 0, 0.4));
     scrollbar-width: thin;
 }
+.searchable-dropdown-list.dropup {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.4);
+}
 .searchable-dropdown-list::-webkit-scrollbar {
     width: 5px;
 }
@@ -216,19 +221,22 @@
                                 <input type="text" 
                                        id="taskClientSearchInput" 
                                        class="form-control form-control-dark @error('client_id') is-invalid @enderror" 
-                                       style="padding-left:34px;padding-right:32px;border-top-right-radius:0;border-bottom-right-radius:0;" 
-                                       placeholder="No client (Internal task) - Type to search..." 
+                                       style="padding-left:34px;padding-right:54px;border-top-right-radius:0;border-bottom-right-radius:0;cursor:pointer;" 
+                                       placeholder="No client (Internal task) - Search or select..." 
                                        autocomplete="off"
                                        value="{{ $selectedClientName }}">
 
                                 <input type="hidden" name="client_id" id="task_client_id" value="{{ $selectedClientId }}">
 
-                                <button type="button" 
-                                        id="taskClientClearBtn" 
-                                        style="position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:2px 4px;border:none;background:transparent;color:var(--text-muted);display:{{ $selectedClientId ? 'block' : 'none' }};z-index:3;cursor:pointer;" 
-                                        title="Clear client selection">
-                                    <i data-lucide="x" style="width:13px;height:13px;"></i>
-                                </button>
+                                <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px;z-index:3;">
+                                    <button type="button" 
+                                            id="taskClientClearBtn" 
+                                            style="padding:2px 4px;border:none;background:transparent;color:var(--text-muted);display:{{ $selectedClientId ? 'block' : 'none' }};cursor:pointer;" 
+                                            title="Clear client selection">
+                                        <i data-lucide="x" style="width:13px;height:13px;"></i>
+                                    </button>
+                                    <i data-lucide="chevron-down" id="taskClientChevron" style="width:14px;height:14px;color:var(--text-muted);pointer-events:none;transition:transform .2s;"></i>
+                                </div>
 
                                 {{-- Dropdown Menu --}}
                                 <div id="taskClientDropdownMenu" class="searchable-dropdown-list">
@@ -650,8 +658,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const menu = document.getElementById('taskClientDropdownMenu');
         const clearBtn = document.getElementById('taskClientClearBtn');
         const noMatch = document.getElementById('noTaskClientMatch');
+        const chevron = document.getElementById('taskClientChevron');
 
         if (!wrap || !input || !hiddenId || !menu) return;
+
+        let activeIndex = -1;
+
+        function getVisibleItems() {
+            return Array.from(menu.querySelectorAll('.searchable-item')).filter(el => el.style.display !== 'none');
+        }
 
         function filterItems(query) {
             const q = query.toLowerCase().trim();
@@ -684,6 +699,56 @@ document.addEventListener('DOMContentLoaded', function() {
             if (noMatch) {
                 noMatch.style.display = visibleCount === 0 ? 'block' : 'none';
             }
+            activeIndex = -1;
+            updateActiveItem();
+        }
+
+        function updateActiveItem() {
+            const visible = getVisibleItems();
+            visible.forEach((el, idx) => {
+                if (idx === activeIndex) {
+                    el.classList.add('focused');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('focused');
+                }
+            });
+        }
+
+        function updateDropdownPosition() {
+            const rect = wrap.getBoundingClientRect();
+            const menuHeight = 250;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+
+            if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                menu.classList.add('dropup');
+            } else {
+                menu.classList.remove('dropup');
+            }
+        }
+
+        function openDropdown() {
+            menu.style.display = 'block';
+            filterItems('');
+            updateDropdownPosition();
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+            
+            const currentId = hiddenId.value;
+            if (currentId) {
+                const selectedEl = menu.querySelector(`.searchable-item[data-id="${currentId}"]`);
+                if (selectedEl) {
+                    selectedEl.scrollIntoView({ block: 'nearest' });
+                }
+            }
+        }
+
+        function closeDropdown() {
+            menu.style.display = 'none';
+            menu.classList.remove('dropup');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+            activeIndex = -1;
+            updateActiveItem();
         }
 
         function selectClient(id, displayName) {
@@ -703,29 +768,70 @@ document.addEventListener('DOMContentLoaded', function() {
                 clearBtn.style.display = id ? 'block' : 'none';
             }
 
-            menu.style.display = 'none';
-            filterItems('');
+            closeDropdown();
         }
 
-        // Open dropdown on focus/click
+        // Focus / Click opens dropdown and selects text for quick replacement
         input.addEventListener('focus', () => {
-            menu.style.display = 'block';
-            filterItems(input.value);
+            openDropdown();
+            setTimeout(() => {
+                input.select();
+            }, 50);
         });
 
-        input.addEventListener('click', () => {
-            menu.style.display = 'block';
+        input.addEventListener('click', (e) => {
+            if (menu.style.display !== 'block') {
+                openDropdown();
+                input.select();
+            }
         });
 
         // Real-time typing in Client field
         input.addEventListener('input', () => {
-            menu.style.display = 'block';
+            if (menu.style.display !== 'block') {
+                menu.style.display = 'block';
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+            }
             filterItems(input.value);
             if (input.value.trim() === '') {
                 hiddenId.value = '';
                 if (clearBtn) clearBtn.style.display = 'none';
             } else {
                 if (clearBtn) clearBtn.style.display = 'block';
+            }
+        });
+
+        // Keyboard navigation
+        input.addEventListener('keydown', (e) => {
+            const visible = getVisibleItems();
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (menu.style.display !== 'block') {
+                    openDropdown();
+                    return;
+                }
+                if (visible.length > 0) {
+                    activeIndex = (activeIndex + 1) % visible.length;
+                    updateActiveItem();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (menu.style.display !== 'block') {
+                    openDropdown();
+                    return;
+                }
+                if (visible.length > 0) {
+                    activeIndex = (activeIndex - 1 + visible.length) % visible.length;
+                    updateActiveItem();
+                }
+            } else if (e.key === 'Enter') {
+                if (menu.style.display === 'block' && activeIndex >= 0 && visible[activeIndex]) {
+                    e.preventDefault();
+                    const item = visible[activeIndex];
+                    selectClient(item.getAttribute('data-id'), item.getAttribute('data-name'));
+                }
+            } else if (e.key === 'Escape') {
+                closeDropdown();
             }
         });
 
@@ -751,23 +857,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // Close when clicking outside
         document.addEventListener('click', (e) => {
             if (!wrap.contains(e.target)) {
-                menu.style.display = 'none';
+                closeDropdown();
                 const currentId = hiddenId.value;
                 if (currentId) {
                     const selectedItem = menu.querySelector(`.searchable-item[data-id="${currentId}"]`);
                     if (selectedItem) {
                         input.value = selectedItem.getAttribute('data-name') || '';
                     }
-                } else if (!input.value.trim()) {
+                } else if (!hiddenId.value) {
                     input.value = '';
+                    if (clearBtn) clearBtn.style.display = 'none';
                 }
-            }
-        });
-
-        // Keyboard navigation (Escape to close)
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                menu.style.display = 'none';
             }
         });
 
